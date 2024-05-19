@@ -1,4 +1,12 @@
 {
+  "name": "your-server",
+  "version": "1.0.0",
+  "description": "Your server description",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+    
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
