@@ -138,45 +138,51 @@ app.post("/api/v1/dailyTasks/:id", async (req, res) => {
 })
 
 
+app.get("/api/v1/dailyCheck", async (req, res) => {
+  try {
+    const tasks = await DailyTask.find();
+    let allTasksDone = true; 
+    let totalAshers = 0;
 
-// Cron job to check at the end of every day (for testing, we'll run it every minute)
-cron.schedule('0 0 * * *', () => {
-  console.log('Cron job triggered at:', new Date());
-  const scheduleMyJob = async () => {
-    try {
-      const tasks = await DailyTask.find();
-      console.log('Tasks fetched:', tasks);
-      let pointsToDeduct = 0;
-
-      for (const task of tasks) {
-        if (!task.isDone) {
-          pointsToDeduct += task.ashers; // Assuming ashers is the correct field
-        }
-        task.isDone = false; // Reset task for the next day
-        await task.save();
+    // Check if all tasks are done
+    for (const task of tasks) {
+      if (!task.isDone) {
+        allTasksDone = false; // If even one task is not done, mark as false
+        break;
       }
-
-      const user = await User.findOne();
-      if (user) {
-        console.log('User before deduction:', user);
-        user.currentLevel -= pointsToDeduct;
-        await user.save();
-        console.log('User after deduction:', user);
-      }
-
-      console.log('Cron job completed. Points deducted:', pointsToDeduct);
-    } catch (error) {
-      console.error('Error during cron job:', error);
+      totalAshers += task.ashers; // Sum ashers only if tasks are done
     }
+
+    const user = await User.findOne(); // Find the user (assuming only one user for now)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (allTasksDone) {
+      user.currentLevel += totalAshers; // Add ashers points to the current level
+    } else {
+      user.currentLevel = 0; // If not all tasks are done, reset user points to 0
+    }
+
+    await user.save();
+
+    // Set all tasks' isDone to false for the next day (Important line)
+    await DailyTask.updateMany({}, { isDone: false });
+
+    // Send the response after all changes are made
+    return res.status(200).json({
+      message: allTasksDone 
+        ? "All tasks completed. Ashers added to the current level." 
+        : "Some tasks were not completed. User points reset to 0.",
+      user,
+    });
+
+  } catch (error) {
+    console.error("Error during daily check:", error);
+    return res.status(500).json({ error: error.message });
   }
-
-  scheduleMyJob();
-
-
-
-}, {
-  timezone: "Asia/Kolkata" // Set your timezone
 });
+
 
 
 
